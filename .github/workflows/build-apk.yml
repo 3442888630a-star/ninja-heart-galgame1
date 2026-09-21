@@ -1,0 +1,59 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Unpack Android project
+        shell: bash
+        run: |
+          set -e
+          mkdir -p _project
+          unzip -q '忍界心跳录_Android项目.zip' -d _project
+
+          PROJECT_ROOT=$(find _project -name settings.gradle -o -name settings.gradle.kts | head -n 1 | xargs -r dirname)
+
+          if [ -z "$PROJECT_ROOT" ]; then
+            echo "Could not locate Gradle Android project."
+            exit 1
+          fi
+
+          echo "PROJECT_ROOT=$PROJECT_ROOT" >> "$GITHUB_ENV"
+          echo "Android project: $PROJECT_ROOT"
+
+      - name: Build debug APK
+        working-directory: ${{ env.PROJECT_ROOT }}
+        run: gradle assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ninja-heart-galgame-debug-apk
+          path: ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
